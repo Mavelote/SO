@@ -2,16 +2,16 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g
 
-# Nome do ficheiro executável final
-TARGET = ex1
-
 # Regra principal
-all: $(TARGET)
+all: ex1 count_words
 
 # Como construir o executável a partir do teu código fonte
-$(TARGET): EX1.C
-	$(CC) $(CFLAGS) -o $(TARGET) EX1.C
+ex1: EX1.C
+	$(CC) $(CFLAGS) -o ex1 EX1.C
+
+count_words: count_words.c
+	$(CC) $(CFLAGS) -o count_words count_words.c
 
 # Regra para apagar o executável e limpar a pasta
 clean:
-	rm -f $(TARGET)
+	rm -f ex1 count_words
