@@ -1,0 +1,25 @@
+Trabalho Prático 1 - Sistemas Operativos
+
+Breve Descrição da Arquitetura e Opções de Implementação
+
+Ao longo deste trabalho, procurou-se garantir a robustez do código através da validação do retorno de todas as chamadas de sistema (fork, exec, pipe, dup2, read, write), utilizando uma função dedicada para o tratamento e reporte de erros. Especial atenção foi dada ao fecho atempado de descritores de ficheiros e à espera pela terminação dos processos filhos (wait/waitpid) para evitar a criação de processos zombie.
+
+Exercício 1: Execução Paralela de Comandos
+A solução baseou-se na execução sequencial de dois comandos fork() pelo processo pai. Esta abordagem permite que ambos os processos filhos (que substituem a sua imagem executável pelos comandos 'date' e 'ping' usando a função execl) corram verdadeiramente em paralelo. O processo pai utiliza posteriormente o waitpid() para aguardar passivamente a terminação específica de cada um dos filhos, recolhendo e imprimindo o seu exit status através das macros WIFEXITED e WEXITSTATUS.
+
+Exercício 2: Comunicação via Pipes (count_words)
+A arquitetura assentou na criação de um pipe unidirecional antes da duplicação do processo (fork). Para redirecionar o output do comando 'wc', o processo filho usou a chamada dup2(pipefd[1], STDOUT_FILENO), substituindo o seu standard output pela extremidade de escrita do pipe. Fechou-se rigorosamente as extremidades do pipe não utilizadas em cada processo (leitura no filho, escrita no pai) para garantir que o processo leitor (pai) recebe o sinal de EOF corretamente e não bloqueia na função read().
+
+Exercício 3: Processamento Multiprocesso (vector-seq-processes)
+Para otimizar a pesquisa e soma num vetor de grandes dimensões, a arquitetura dividiu o vetor em 'N' blocos de tamanho aproximadamente igual, lançando um processo filho por cada bloco.
+Opção de implementação: Para otimizar a comunicação IPC (Inter-Process Communication), criou-se uma estrutura de dados (struct) contendo o valor máximo, mínimo e a soma parcial. Assim, cada processo filho envia os seus três resultados numa única operação de write() para o seu pipe exclusivo. O pai agrega estes resultados parciais para encontrar os valores globais.
+
+Avaliação de Desempenho (clock_gettime com CLOCK_MONOTONIC):
+Vetor de teste: 600.000.000 posições.
+
+- Versão Sequencial (1 processo): 1.06 segundos
+- Versão Multiprocesso (2 processos): 0.63 segundos
+- Versão Multiprocesso (4 processos): 0.33 segundos
+- Versão Multiprocesso (8 processos): 0.22 segundos
+
+Conclusão dos testes: Observou-se uma redução significativa do tempo de processamento à medida que a carga de trabalho foi distribuída por múltiplos processos, demonstrando a eficácia do processamento paralelo neste tipo de operações intensivas no CPU.
