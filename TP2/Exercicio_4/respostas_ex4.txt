@@ -1,0 +1,25 @@
+Respostas ao Exercício 4
+
+a.
+    1 - V
+    2 - F
+    3 - F
+    4 - V
+
+b.
+    1 - F
+    2 - V
+    3 - F
+    4 - V
+
+c.
+    1 - F
+    2 - V
+    3 - F
+    4 - F
+
+d.
+    1 - V - É o cenário clássico para aproveitar processadores Multicore.
+    2 - F - Para programas diferentes usa-se fork() + exec(). Tarefas correm dentro do mesmo programa.
+    3 - V - Permite, por exemplo, ter uma tarefa bloqueada na rede enquanto outra faz cálculos.
+    4 - F - Mais uma vez, tarefas num mesmo processo partilham obrigatoriamente o espaço de endereçamento.

@@ -1,0 +1,17 @@
+Trabalho Prático 2 - Sistemas Operativos
+Breve Descrição da Arquitetura e Opções de Implementação
+
+Neste trabalho, o foco incidiu na comunicação entre processos via Sockets e no processamento paralelo utilizando tarefas POSIX (pthreads), garantindo o tratamento adequado de erros e a libertação de recursos.
+
+Exercício 1: Comunicação Cliente-Servidor (UNIX e TCP)
+Na implementação do servidor concorrente, optou-se pela utilização de sockets no domínio UNIX (alínea a) e Internet (alínea b). Na alínea c), para garantir que um único processo conseguisse escutar ligações simultaneamente em ambos os domínios sem bloquear, implementou-se a multiplexagem de I/O através da chamada de sistema select(). Isto permitiu monitorizar o descritor de ficheiro do socket UNIX e do socket TCP em simultâneo, aceitando a ligação no que reportasse atividade.
+
+Exercício 2: Processamento com Múltiplas Tarefas POSIX
+O processamento do vetor foi dividido por N tarefas. Durante a implementação inicial, notou-se um aumento de tempo com múltiplas threads devido ao fenómeno de "False Sharing" na cache do processador (múltiplas threads a escrever simultaneamente na mesma linha de cache da estrutura partilhada). A opção arquitetural para resolver isto foi utilizar variáveis locais nas tarefas trabalhadoras para acumular as somas e os extremos temporariamente, escrevendo na estrutura global apenas no final do processamento. 
+Tempos obtidos (Vetor 600.000.000):
+- Versão 1 Tarefa: [1.049235] s
+- Versão 4 Tarefas: [0.311129] s
+
+Exercício 3: Servidor de Estatística Concorrente
+A arquitetura baseia-se num modelo "Boss-Worker". A thread principal (Boss) faz o accept() das ligações TCP e delega imediatamente o descritor do cliente para uma nova tarefa. Esta tarefa de cliente foi criada no estado 'detached' (pthread_detach) para garantir que os seus recursos são libertados automaticamente pelo SO quando terminar, sem necessidade da thread principal fazer join().
+Para lidar com o tamanho variável das mensagens TCP e as diferentes arquiteturas de hardware, garantiu-se que todos os inteiros lidos e escritos da rede usassem funções de conversão de Endianness (htonl/ntohl para 32-bits e htons/ntohs para 16-bits). O processamento estatístico foi feito reaproveitando a lógica de concorrência e variáveis locais do Exercício 2.
