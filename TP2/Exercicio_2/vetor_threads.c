@@ -44,19 +44,24 @@ void vector_random_init_short(short values[], unsigned long dim) {
 void* process_chunk(void* arg) {
     ThreadData* data = (ThreadData*)arg;
     
-   
-    data->smaller = values[data->start];
-    data->bigger = values[data->start];
-    data->sum = values[data->start];
+    // usar variáveis locais rápidas
+    int local_smaller = values[data->start];
+    int local_bigger = values[data->start];
+    long local_sum = values[data->start];
 
-    
+    //processar o resto da fatia usando apenas as variáveis locais
     for (unsigned long i = data->start + 1; i < data->end; ++i) {
-        data->sum += values[i];
-        if (values[i] > data->bigger) data->bigger = values[i];
-        if (values[i] < data->smaller) data->smaller = values[i];
+        local_sum += values[i];
+        if (values[i] > local_bigger) local_bigger = values[i];
+        if (values[i] < local_smaller) local_smaller = values[i];
     }
     
-    return NULL; 
+    // só no fim é que guardamos o resultado na memória partilhada
+    data->smaller = local_smaller;
+    data->bigger = local_bigger;
+    data->sum = local_sum;
+
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
