@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -pthread -g -O2
 LDFLAGS = -pthread
 
 # Caminhos relativos para a biblioteca do Thread Pool
-DIR_EX2 = ../Exercicio_2
+DIR_EX2 = ../Exercicio2
 
 # Ficheiros objeto necessários
 OBJS = servidor_estatistica_pool.o $(DIR_EX2)/thread_pool.o

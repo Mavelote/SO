@@ -28,10 +28,9 @@ typedef struct {
 
 ServerStats global_stats;
 
-// Estrutura para passar dados ao trabalhador do Thread Pool
 typedef struct {
     int client_fd;
-    int is_tcp; // 1 = TCP, 0 = UNIX
+    int is_tcp; 
 } ClientData;
 
 ssize_t read_all(int fd, void *buffer, size_t n) {
@@ -45,10 +44,10 @@ ssize_t read_all(int fd, void *buffer, size_t n) {
 }
 
 void *print_statistics_func(void *arg) {
-    (void)arg; // Previne warnings de unused parameter
+    (void)arg; 
     
     while (1) {
-        sleep(1); // Espera 1 segundo
+        sleep(1); 
         
         pthread_mutex_lock(&global_stats.stat_mutex);
         
@@ -74,13 +73,17 @@ void handle_client(void *arg) {
     ClientData *cdata = (ClientData *)arg;
     int client_fd = cdata->client_fd;
     int is_tcp = cdata->is_tcp;
-    free(cdata); // Libertar a memória alocada no main
+    free(cdata); 
+
+    pthread_mutex_lock(&global_stats.stat_mutex);
+    if (is_tcp) global_stats.tcp_connections++;
+    else global_stats.unix_connections++;
+    pthread_mutex_unlock(&global_stats.stat_mutex);
 
     uint16_t *vector = NULL;
     uint32_t total_elements = 0;
     uint8_t status = 0; 
 
-    // Lê o vetor da rede
     while (1) {
         uint32_t net_block_size;
         if (read_all(client_fd, &net_block_size, sizeof(net_block_size)) <= 0) {
@@ -114,18 +117,11 @@ void handle_client(void *arg) {
 
     if (total_elements == 0 && status == 0) status = 1;
 
-    // Se a leitura correu bem, processar as contas sequencialmente 
-    // (O trabalho já está no Thread Pool, não precisamos de lançar mais threads!)
     if (status == 0) {
-        
-        //Atualiar as estatísticas globais do servidor
         pthread_mutex_lock(&global_stats.stat_mutex);
-        if (is_tcp) global_stats.tcp_connections++;
-        else global_stats.unix_connections++;
         global_stats.total_vector_elements += total_elements;
         pthread_mutex_unlock(&global_stats.stat_mutex);
        
-
         uint16_t global_min = UINT16_MAX;
         uint16_t global_max = 0;
         uint64_t global_sum = 0;
@@ -136,21 +132,24 @@ void handle_client(void *arg) {
              if (vector[i] < global_min) global_min = vector[i];
         }
 
-        // Responder ao cliente
-        write(client_fd, &status, 1);
+        // VERIFICAÇÃO DE ERROS NO WRITE:
+        if (write(client_fd, &status, 1) < 0) perror("Erro no write status");
+        
         uint16_t net_min = htons(global_min);
         uint16_t net_max = htons(global_max);
         uint64_t net_sum = htobe64(global_sum); 
 
-        write(client_fd, &net_min, sizeof(net_min));
-        write(client_fd, &net_max, sizeof(net_max));
-        write(client_fd, &net_sum, sizeof(net_sum));
+        if (write(client_fd, &net_min, sizeof(net_min)) < 0) perror("Erro min");
+        if (write(client_fd, &net_max, sizeof(net_max)) < 0) perror("Erro max");
+        if (write(client_fd, &net_sum, sizeof(net_sum)) < 0) perror("Erro sum");
+        
     } else {
-        write(client_fd, &status, 1);
+        if (write(client_fd, &status, 1) < 0) perror("Erro no write erro");
         char *err_msg = (status == 1) ? "Pedido invalido" : "Erro interno";
         uint32_t err_len_net = htonl(strlen(err_msg) + 1);
-        write(client_fd, &err_len_net, sizeof(err_len_net));
-        write(client_fd, err_msg, strlen(err_msg) + 1);
+        
+        if (write(client_fd, &err_len_net, sizeof(err_len_net)) < 0) perror("Erro len");
+        if (write(client_fd, err_msg, strlen(err_msg) + 1) < 0) perror("Erro msg");
     }
 
     free(vector); 
@@ -159,24 +158,20 @@ void handle_client(void *arg) {
 
 int max(int a, int b) { return (a > b) ? a : b; }
 
-int main() {
-    // Inicializar as estatísticas
+int main(void) {
     memset(&global_stats, 0, sizeof(ServerStats));
     pthread_mutex_init(&global_stats.stat_mutex, NULL);
 
-    // Lançar a tarefa de estatísticas
     pthread_t stats_thread;
     pthread_create(&stats_thread, NULL, print_statistics_func, NULL);
-    pthread_detach(stats_thread); // Deixar a thread livre
+    pthread_detach(stats_thread); 
 
     thread_pool_t *pool = thread_pool_create(NUM_WORKER_THREADS);
 
-    // Preparar os sockets
     int server_fd_unix, server_fd_inet;
     struct sockaddr_un addr_unix;
     struct sockaddr_in addr_inet;
 
-    // SOCKET UNIX
     server_fd_unix = socket(AF_UNIX, SOCK_STREAM, 0);
     unlink(SOCKET_PATH);
     memset(&addr_unix, 0, sizeof(addr_unix));
@@ -185,7 +180,6 @@ int main() {
     bind(server_fd_unix, (struct sockaddr*)&addr_unix, sizeof(addr_unix));
     listen(server_fd_unix, 5);
 
-    // SOCKET INET
     server_fd_inet = socket(AF_INET, SOCK_STREAM, 0);
     int opt = 1;
     setsockopt(server_fd_inet, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -201,7 +195,6 @@ int main() {
     
     printf("Super Servidor MULTIPLEXADO com Thread Pool a correr...\n");
 
-    // CICLO INFINITO DE ATENDIMENTO
     while (1) {
         FD_ZERO(&readfds);
         FD_SET(server_fd_unix, &readfds);
@@ -225,7 +218,6 @@ int main() {
         }
 
         if (new_socket >= 0) {
-            // Em vez de criar thread, SUBMETER ao Thread Pool!
             ClientData *cdata = malloc(sizeof(ClientData));
             cdata->client_fd = new_socket;
             cdata->is_tcp = is_tcp_conn;

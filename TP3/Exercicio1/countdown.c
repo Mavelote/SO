@@ -6,9 +6,8 @@ int countdown_init(countdown_t *cd, int initialValue) {
     cd->count = initialValue;
 
     if (pthread_mutex_init(&cd->mutex, NULL) != 0) return -1;
-    if (pthread_cond_init(&cd -> cond, NULL)!= 0)
-    {
-        phtread_mutex_destroy(&cd->mutex);
+    if (pthread_cond_init(&cd->cond, NULL) != 0) {
+        pthread_mutex_destroy(&cd->mutex);
         return -1;
     }
 
@@ -32,38 +31,31 @@ int countdown_down(countdown_t *cd) {
     if (cd->count > 0) {
         cd->count--;
 
-        if (cd->count == 0)
-        {
-            phtread_cond_broadcast(&cd->cond);
+        if (cd->count == 0) {
+            pthread_cond_broadcast(&cd->cond);
         }
-        
     }
+    
     pthread_mutex_unlock(&cd->mutex);
 
     return 0;
 }
 
-int countdown_wait(countdown_t *cd){
-    if (cd == NULL)
-    {
+int countdown_wait(countdown_t *cd) {
+    if (cd == NULL) return -1;
+
+    pthread_mutex_lock(&cd->mutex);
+
+    if (cd->count == 0) {
+        pthread_mutex_unlock(&cd->mutex);
         return -1;
     }
 
-    phtread_mutex_lock(&cd->mutex);
-
-    if (cd -> count == 0)
-    {
-        phtread_mutex_unlock(&cd->mutex);
-        return -1;
+    while (cd->count > 0) {
+        pthread_cond_wait(&cd->cond, &cd->mutex);
     }
 
-    while (cd->count > 0)
-    {
-        phtread_cond_wait(&cd->cond, &cd->mutex);
-    }
-
-    phtread_mutex_unlock(&cd->mutex);
+    pthread_mutex_unlock(&cd->mutex);
 
     return 0;
 }
-    
