@@ -1,0 +1,21 @@
+Trabalho Prático 3 - Sistemas Operativos
+Breve Descrição da Arquitetura e Opções de Implementação
+
+Neste trabalho, o foco incidiu na gestão avançada de concorrência, mitigação do custo de alocação de tarefas através de um Thread Pool, e no controlo rigoroso de sincronismo e partilha de recursos utilizando a norma POSIX (Mutexes e Variáveis de Condição).
+
+Exercício 1: Mecanismo de Sincronismo (countdown_t)
+Para permitir que uma tarefa principal aguarde a conclusão de múltiplas subtarefas em paralelo, implementou-se uma barreira de contagem decrescente.
+A opção arquitetural crítica para evitar bloqueios permanentes (deadlocks) foi a utilização da primitiva pthread_cond_broadcast() em vez de pthread_cond_signal(). Isto garante que, no exato momento em que o contador atinge zero, todas as tarefas que se encontrem eventualmente suspensas no countdown_wait() sejam acordadas em simultâneo.
+
+Exercício 2: Gestor de Tarefas (Thread Pool)
+Para resolver o elevado overhead computacional associado à criação e destruição constante de threads sob alta carga de pedidos, implementou-se um padrão Producer-Consumer suportado por uma lista ligada.
+Para a implementação da Terminação Graciosa (thread_pool_destroy), rejeitou-se o cancelamento forçado das tarefas. A opção tomada foi a injeção de "Pílulas de Veneno" (Poison Pills — itens de trabalho com a função a NULL) diretamente na fila. Esta abordagem assegura que as threads trabalhadoras processam todo o trabalho pendente antes de reconhecerem o sinal de encerramento e terminarem de forma limpa.
+
+Exercício 3: Processamento Vetorial Assíncrono
+O cálculo estatístico do vetor gigante foi refatorizado para aproveitar o Thread Pool.
+A grande alteração estrutural face ao Trabalho 2 foi o abandono da função pthread_join(), uma vez que as worker threads do Pool nunca morrem durante a execução normal. A sincronização passou a ser feita delegando um ponteiro do countdown_t (desenvolvido no Exercício 1) nas estruturas de trabalho, permitindo ao processo pai aguardar pelo fim dos cálculos de forma totalmente assíncrona.
+
+Exercício 4: Servidor Concorrente de Estatísticas (Multiplexado)
+A arquitetura baseou-se numa evolução do modelo "Boss-Worker" fundida com multiplexagem de I/O (select()).
+A thread principal (Boss) escuta, em simultâneo e de forma não bloqueante, sockets do domínio UNIX e TCP. Após aceitar a ligação, submete o descritor do cliente diretamente para a fila do Thread Pool, limitando o número de tarefas ativas e protegendo a memória do Sistema Operativo contra picos extremos de tráfego.
+Dado que os múltiplos clientes processados em paralelo pelo Pool alteram as estatísticas globais do servidor, implementou-se exclusão mútua estrita. Toda a manipulação e leitura das variáveis de estatística foi protegida por um pthread_mutex_t dedicado, prevenindo qualquer Race Condition entre os workers e a tarefa paralela de impressão periódica de estatísticas.
